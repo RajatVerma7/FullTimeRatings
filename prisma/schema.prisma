@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          String   @id @db.Uuid
+  username    String   @unique
+  displayName String?  @map("display_name")
+  avatarUrl   String?  @map("avatar_url")
+  bio         String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  ratings  Rating[]
+  reviews  Review[]
+  lists    List[]
+  likes    Like[]
+  comments Comment[]
+  followers  Follow[] @relation("Followers")
+  following  Follow[] @relation("Following")
+
+  @@map("users")
+}
+
+model Team {
+  id         String @id @default(cuid())
+  externalId Int?   @unique @map("external_id")
+  name       String
+  slug       String @unique
+
+  homeMatches Match[] @relation("HomeTeam")
+  awayMatches Match[] @relation("AwayTeam")
+
+  @@map("teams")
+}
+
+model Tournament {
+  id         String @id @default(cuid())
+  externalId Int?   @unique @map("external_id")
+  name       String
+  slug       String @unique
+
+  matches Match[]
+
+  @@map("tournaments")
+}
+
+model Match {
+  id           String   @id @default(cuid())
+  externalId   Int?     @unique @map("external_id")
+  slug         String   @unique
+  homeTeamId   String   @map("home_team_id")
+  awayTeamId   String   @map("away_team_id")
+  tournamentId String   @map("tournament_id")
+  matchDate    DateTime @map("match_date")
+  homeScore    Int?     @map("home_score")
+  awayScore    Int?     @map("away_score")
+  avgRating    Float    @default(0) @map("avg_rating")
+  ratingCount  Int      @default(0) @map("rating_count")
+  reviewCount  Int      @default(0) @map("review_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  homeTeam   Team       @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam   Team       @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  ratings    Rating[]
+  reviews    Review[]
+  listItems  ListItem[]
+
+  @@index([matchDate])
+  @@index([avgRating(sort: Desc)])
+  @@map("matches")
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id") @db.Uuid
+  matchId   String   @map("match_id")
+  value     Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId])
+  @@index([matchId])
+  @@map("ratings")
+}
+
+model Review {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id") @db.Uuid
+  matchId      String   @map("match_id")
+  title        String?
+  content      String
+  rating       Int?
+  helpfulCount Int      @default(0) @map("helpful_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match    Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  likes    Like[]
+  comments Comment[]
+
+  @@index([matchId])
+  @@index([createdAt(sort: Desc)])
+  @@map("reviews")
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id") @db.Uuid
+  reviewId  String   @map("review_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, reviewId])
+  @@map("likes")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id") @db.Uuid
+  reviewId  String   @map("review_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model List {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id") @db.Uuid
+  title       String
+  description String?
+  slug        String
+  isPublic    Boolean  @default(true) @map("is_public")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items ListItem[]
+
+  @@unique([userId, slug])
+  @@map("lists")
+}
+
+model ListItem {
+  id       String  @id @default(cuid())
+  listId   String  @map("list_id")
+  matchId  String  @map("match_id")
+  position Int
+  note     String?
+
+  list  List  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, matchId])
+  @@map("list_items")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String   @map("follower_id") @db.Uuid
+  followingId String   @map("following_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower  User @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
